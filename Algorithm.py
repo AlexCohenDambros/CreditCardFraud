@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy.stats import iqr
 
 from sklearn import preprocessing
 from sklearn.preprocessing import StandardScaler
@@ -44,22 +45,77 @@ plt.tight_layout()
 dataset_notfraud = dataset[dataset["Class"] == 0]
 dataset_fraud = dataset[dataset["Class"] == 1]
 
-fig, ax = plt.subplots(1, 2, figsize=(18,4))
+fig, ax = plt.subplots(1, 2, figsize=(18, 4))
 
 time_val_fraud = dataset_fraud['Time'].values
 time_val_not_fraud = dataset_notfraud['Time'].values
 
-sns.distplot(time_val_not_fraud, ax=ax[0], color='r', bins = 48)
+sns.distplot(time_val_not_fraud, ax=ax[0], color='r', bins=48)
 ax[0].set_title('Districuição de transações normais', fontsize=14)
 ax[0].set_xlim([min(time_val_not_fraud), max(time_val_not_fraud)])
 ax[0].set_xlabel("Tempo")
 ax[0].set_ylabel("Contagem")
 
-sns.distplot(time_val_fraud, ax=ax[1], color='b', bins = 48)
+sns.distplot(time_val_fraud, ax=ax[1], color='b', bins=48)
 ax[1].set_title('Distribuição de transações fraudulentas', fontsize=14)
 ax[1].set_xlim([min(time_val_fraud), max(time_val_fraud)])
 ax[1].set_xlabel("Tempo")
 ax[1].set_ylabel("Contagem")
 
+
+# remoção de valores discrepantes
+upper_limit = dataset.Amount.quantile(0.75) + (1.5 * iqr(dataset.Amount))
+print("\n", upper_limit)
+print(dataset[dataset.Amount > upper_limit]["Class"].value_counts())
+
+dataset = dataset[dataset.Amount <= 8000]
+print("\n", dataset.Class.value_counts())
+print("\nPorcentagem de atividade fraudulenta -> {:.2%}".format(
+    (dataset[dataset.Class == 1].shape[0] / dataset.shape[0])))
+
 plt.ticklabel_format(style='plain', axis='y')
+
+# ============= Análise de correlação =============
+correlacao = dataset.corr()
+fig, ax = plt.subplots(figsize=(9, 7))
+
+sns.heatmap(correlacao, xticklabels=correlacao.columns,
+            yticklabels=correlacao.columns, linewidths=.1, cmap="RdBu", ax=ax)
+plt.tight_layout()
+
+
+# Selecionando 3000 mil linhas de usuários nao fraudulentos.
+# E criando um conjunto de dados para treino.
+
+not_fraud = dataset[dataset.Class == 0].sample(3000)
+fraud = dataset[dataset.Class == 1]
+
+print("\nConjunto de dados para treino ->>")
+print(f"\nQuantidade de usuários nao fraudulentos: {len(not_fraud)}"
+      f"\nQuantidade de usuários fraudulentos: {len(fraud)}")
+
+new_dataset_Treino =  not_fraud.append(fraud).sample(frac = 1).reset_index(drop = True)
+X = new_dataset_Treino.drop(["Class"], axis = 1).values
+y = new_dataset_Treino.Class.values
+
+p = TSNE(n_components = 2, random_state = 42).fit_transform(X)
+print(p)
+
+
+color_map = {0: 'red', 1: "blue"}
+plt.figure()
+for idx, cl in enumerate(np.unique(y)):
+    plt.scatter(
+        x = p[y == cl, 0],
+        y = p[y == cl, 1],
+        c = color_map[idx],
+        label = cl
+    )
+
+plt.xlabel("X no t-SNE")
+plt.ylabel("y no t-SNE")
+plt.legend(loc = "upper left")
+plt.title("Visualização dos dados de teste")
+
+
 plt.show()
