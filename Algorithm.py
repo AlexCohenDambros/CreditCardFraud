@@ -11,6 +11,7 @@ from sklearn.metrics import classification_report, accuracy_score, confusion_mat
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
 
 from keras import regularizers
 from keras.models import Model, Sequential
@@ -169,5 +170,60 @@ plt.xlabel("X no t-SNE")
 plt.ylabel("y no t-SNE")
 plt.legend(loc="upper left")
 plt.title("t-SNE -> Visualização do teste")
+
+# Treinando o LogisticRegression e o clasificador Árvore de Decisão
+
+X_train, X_test, y_train, y_test = train_test_split(
+    rep_x, rep_y, test_size=.3, random_state=42, stratify=rep_y)
+
+def logisticRegression():
+    clf = LogisticRegression(solver = "lbfgs").fit(X_train, y_train)
+    
+    pred_y = clf.predict(X_test)
+    
+    print(classification_report(y_test, pred_y))
+    
+    # Matrix de confusão
+    fig, ax = plt.subplots()
+    sns.heatmap(confusion_matrix(y_test, pred_y, normalize = "true"), annot = True, ax=ax)
+    
+    ax.set_title("Matrix de confusão Regressor")
+    ax.set_ylabel("Valor real")
+    ax.set_xlabel("Valor Previsto")
+    
+def decisionTreeClassifier(folds, parameters):
+    clfa = DecisionTreeClassifier(random_state=42)
+    
+    clfa = GridSearchCV(clfa, parameters, scoring='accuracy', n_jobs=-1)
+    
+    clfa.fit(X_train, y_train)
+    
+    pred_y = clfa.predict(X_test)
+    
+    print(classification_report(y_test, pred_y))
+    
+    # Matrix de confusão
+    fig, ax = plt.subplots()
+    sns.heatmap(confusion_matrix(y_test, pred_y, normalize = "true"), annot = True, ax=ax)
+    
+    ax.set_title("Matrix de confusão Classificador")
+    ax.set_ylabel("Valor real")
+    ax.set_xlabel("Valor Previsto")
+
+
+
+parametrosDecisionTrees = [
+    {'max_depth': range(3, 60, 3),
+     'min_samples_split': range(5, 25, 5),
+     'criterion': ['entropy', 'gini'],
+     'splitter':['best', 'random']},
+]
+
+
+folds = 10    
+print("\n ===== Treinando o Regressor =====")   
+logisticRegression()
+print("\n ===== Treinando o Classificador =====")   
+decisionTreeClassifier(folds, parametrosDecisionTrees)
 
 plt.show()
