@@ -94,11 +94,12 @@ print("\nConjunto de dados para treino ->>")
 print(f"\nQuantidade de usuários nao fraudulentos: {len(not_fraud)}"
       f"\nQuantidade de usuários fraudulentos: {len(fraud)}")
 
-new_dataset_Treino =  not_fraud.append(fraud).sample(frac = 1).reset_index(drop = True)
-X = new_dataset_Treino.drop(["Class"], axis = 1).values
+new_dataset_Treino = not_fraud.append(
+    fraud).sample(frac=1).reset_index(drop=True)
+X = new_dataset_Treino.drop(["Class"], axis=1).values
 y = new_dataset_Treino.Class.values
 
-p = TSNE(n_components = 2, random_state = 42).fit_transform(X)
+p = TSNE(n_components=2, random_state=42).fit_transform(X)
 print(p)
 
 
@@ -106,16 +107,67 @@ color_map = {0: 'red', 1: "blue"}
 plt.figure()
 for idx, cl in enumerate(np.unique(y)):
     plt.scatter(
-        x = p[y == cl, 0],
-        y = p[y == cl, 1],
-        c = color_map[idx],
-        label = cl
+        x=p[y == cl, 0],
+        y=p[y == cl, 1],
+        c=color_map[idx],
+        label=cl
     )
 
 plt.xlabel("X no t-SNE")
 plt.ylabel("y no t-SNE")
-plt.legend(loc = "upper left")
+plt.legend(loc="upper left")
 plt.title("Visualização dos dados de teste")
 
+# Autoencorder para detecção de fraudes
+
+x_scale = preprocessing.MinMaxScaler().fit_transform(X)
+x_norm, x_fraud = x_scale[y == 0], x_scale[y == 1]
+
+autoencorder = Sequential()
+autoencorder.add(Dense(X.shape[1], activation="tanh"))
+autoencorder.add(Dense(100, activation="tanh"))
+autoencorder.add(Dense(50, activation="relu"))
+autoencorder.add(Dense(50, activation="tanh"))
+autoencorder.add(Dense(100, activation="tanh"))
+autoencorder.add(Dense(X.shape[1], activation="relu"))
+
+autoencorder.compile(optimizer="adadelta", loss="mse")
+
+
+# Treinando o autoencoder
+autoencorder.fit(x_norm, x_norm,
+                 batch_size=256, epochs=10,
+                 shuffle=True, validation_split=0.20)
+
+hidden_representation = Sequential()
+hidden_representation.add(autoencorder.layers[0])
+hidden_representation.add(autoencorder.layers[1])
+hidden_representation.add(autoencorder.layers[2])
+
+norm_hid_rep = hidden_representation.predict(x_norm)
+fraud_hid_rep = hidden_representation.predict(x_fraud)
+
+rep_x = np.append(norm_hid_rep, fraud_hid_rep, axis=0)
+y_n = np.zeros(norm_hid_rep.shape[0])
+y_f = np.ones(fraud_hid_rep.shape[0])
+rep_y = np.append(y_n, y_f)
+
+
+p = TSNE(n_components = 2, random_state = 42).fit_transform(rep_x)
+
+color_map = {0: 'red', 1: "blue"}
+plt.figure()
+for idx, cl in enumerate(np.unique(y)):
+    plt.scatter(
+        x=p[y == cl, 0],
+        y=p[y == cl, 1],
+        c=color_map[idx],
+        label=cl
+    )
+    
+plt.xlabel("X no t-SNE")
+plt.ylabel("y no t-SNE")
+plt.legend(loc="upper left")
+plt.title("t-SNE -> Visualização do teste")
 
 plt.show()
